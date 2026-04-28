@@ -1,0 +1,13 @@
+merveille-env/
+env/
+
+*.db
+
+__pycache__/
+*.pyc
+*.pyo
+
+.DS_Store
+Thumbs.db
+
+.env

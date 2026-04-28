@@ -1,55 +1,93 @@
-import os
+from flask import Flask, render_template, request, redirect, url_for
 import sqlite3
-from flask import Flask, render_template, request
 
 app = Flask(__name__)
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-def get_db_connection():
-    db_path = os.path.join(BASE_DIR, 'cms.db')
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-# Analyse automatique de l'IMC
-def interpreter_imc(imc):
-    if imc < 18.5: return "Insuffisance pondérale"
-    elif 18.5 <= imc < 25: return "Corpulence normale"
-    elif 25 <= imc < 30: return "Surpoids"
-    else: return "Obésité"
-
-@app.route('/')
-def index():
-    return render_template('formulaire.html')
-
-@app.route('/enregistrer', methods=['POST'])
-def enregistrer():
-    nom = request.form['nom']
-    sexe = request.form['sexe']
-    taille = float(request.form['taille'])
-    poids = float(request.form['poids'])
-    
-    imc = round(poids / (taille * taille), 2)
-    diagnostic = interpreter_imc(imc)
-    
-    conn = get_db_connection()
-    conn.execute('INSERT INTO Etudiant (nom, sexe, imc, diagnostic) VALUES (?, ?, ?, ?)',
-                 (nom, sexe, imc, diagnostic))
+def init_db():
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nom TEXT,
+        prenom TEXT,
+        sexe TEXT,
+        date_naissance TEXT,
+        telephone TEXT,
+        taille REAL,
+        poids REAL,
+        imc REAL,
+        tension TEXT
+    )
+    """)
     conn.commit()
     conn.close()
-    
-    return render_template('resultat.html', nom=nom, imc=imc, diag=diagnostic)
 
-# Route pour les Diagrammes (Analyse Visuelle)
-@app.route('/stats')
-def stats():
-    conn = get_db_connection()
-    # Données pour le Camembert (Sexe)
-    sexe_data = conn.execute("SELECT sexe, COUNT(*) as count FROM Etudiant GROUP BY sexe").fetchall()
-    # Données pour l'Histogramme (Diagnostic)
-    diag_data = conn.execute("SELECT diagnostic, COUNT(*) as count FROM Etudiant GROUP BY diagnostic").fetchall()
+init_db()
+
+@app.route("/")
+def accueil():
+    return render_template("accueil.html")
+
+@app.route("/formulaire", methods=["GET", "POST"])
+def formulaire():
+    if request.method == "POST":
+        data = request.form
+
+        taille = float(data["taille"]) / 100  # cm -> m
+        poids = float(data["poids"])
+        imc = poids / (taille ** 2)
+
+        conn = sqlite3.connect("database.db")
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        INSERT INTO users (nom, prenom, sexe, date_naissance, telephone, taille, poids, imc, tension)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            data["nom"],
+            data["prenom"],
+            data["sexe"],
+            data["date_naissance"],
+            data["telephone"],
+            data["taille"],
+            data["poids"],
+            imc,
+            data["tension"]
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for("merci"))
+
+    return render_template("formulaire.html")
+
+@app.route("/merci")
+def merci():
+    return render_template("merci.html")
+
+@app.route("/dashboard")
+def dashboard():
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT sexe, imc FROM users")
+    data = cursor.fetchall()
+
     conn.close()
-    return render_template('stats.html', sexe_data=sexe_data, diag_data=diag_data)
 
-if __name__ == '__main__':
+    hommes = sum(1 for d in data if d[0] == "Homme")
+    femmes = sum(1 for d in data if d[0] == "Femme")
+
+    imc_values = [d[1] for d in data]
+
+    return render_template(
+        "dashboard.html",
+        hommes=hommes,
+        femmes=femmes,
+        imc_values=imc_values
+    )
+
+if __name__ == "__main__":
     app.run(debug=True)

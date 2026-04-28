@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="w-full max-w-6xl space-y-6">
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <div class="glass p-4 md:p-6">
+            <h2 class="text-lg md:text-xl mb-4">
+                Répartition Homme / Femme
+            </h2>
+            <canvas id="sexeChart"></canvas>
+        </div>
+
+        <div class="glass p-4 md:p-6">
+            <h2 class="text-lg md:text-xl mb-4">
+                Distribution IMC
+            </h2>
+            <canvas id="imcChart"></canvas>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+const sexeChart = new Chart(document.getElementById('sexeChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Hommes', 'Femmes'],
+        datasets: [{
+            data: [{{ hommes }}, {{ femmes }}]
+        }]
+    }
+});
+
+const imcChart = new Chart(document.getElementById('imcChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ imc_values | tojson }},
+        datasets: [{
+            label: 'IMC',
+            data: {{ imc_values | tojson }}
+        }]
+    }
+});
+</script>
+
+{% endblock %}
